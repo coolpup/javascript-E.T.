@@ -46,3 +46,8 @@ Code borrowed and inspired heavily from [jakesgordon's](https://github.com/jakes
 
 [Fixing ET article](http://www.neocomputer.org/projects/et/) - one the original inspirations for making this
 
+[index of 6502 opcodes](http://www.6502.org/tutorials/6502opcodes.html)
+
+[Easy 6502](https://skilldrick.github.io/easy6502/)
+
+[JS 6502 assembler and compiler](https://github.com/skilldrick/6502js)

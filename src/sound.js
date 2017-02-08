@@ -1,70 +1,69 @@
 /*
 http://www.qotile.net/files/2600_music_guide.txt
 http://www.popular-musicology-online.com/issues/01/collins-01.html
-===================================================================
-2 TIA Sound Overview
-===================================================================
+http://www.alienbill.com/2600/cookbook/music.html
 
-The TIA is the chip in the Atari 2600 that produces audio and video.  The audio portion has two independent voices, each of which has a 4 bit volume control (16 values), 5 bit pitch (32 values), and a 4 bit control register which selects the type of sound you will hear.  When writing software for the Atari, the standard labels for these registers are AUDV0 and AUDV1 for the volume registers, AUDF0 and AUDF1 for the pitch registers, and AUDC0 and AUDC1 for the control registers.  The 5 bit pitch is very limited and the frequency values are simply divided down from the system clock, so many of the pitch values are not in-tune with others.  Note that setting the pitch register to a lower value results in a higher pitch.
+http://www.alienbill.com/2600/cookbook/music/stolberg.txt
 
-2 independent voices
-- 4 bit volume (16 values)
-- 5 bit pitch (32 values)
-- 4 bit rcontrol egister: 
--- AUDV0 and AUDV1 for the volume registers
--- AUDF0 and AUDF1 for the pitch registers
--- AUDC0 and AUDC1 for the control registers
+==============================================================================
+How to read the tables:
 
-;============================================================================
-; T I A - M U S I C  C O N S T A N T S
-;============================================================================
- 
-SOUND_CHANNEL_SAW       = 1         ; sounds similar to a saw waveform
-SOUND_CHANNEL_ENGINE    = 3         ; many games use this for an engine sound
-SOUND_CHANNEL_SQUARE    = 4         ; a high pitched square waveform
-SOUND_CHANNEL_BASS      = 6         ; fat bass sound
-SOUND_CHANNEL_PITFALL   = 7         ; log sound in pitfall, low and buzzy
-SOUND_CHANNEL_NOISE     = 8         ; white noise
-SOUND_CHANNEL_LEAD      = 12        ; lower pitch square wave sound
-SOUND_CHANNEL_BUZZ      = 15        ; atonal buzz, good for percussion
- 
-LEAD_F4_SHARP           = 13
-LEAD_E4                 = 15
-LEAD_D4_SHARP           = 16
-LEAD_D4                 = 17
-LEAD_C4_SHARP           = 18
-LEAD_H3                 = 20
-LEAD_A3                 = 23
-LEAD_G3_SHARP           = 24
-LEAD_F3_SHARP           = 27
-LEAD_E3_2               = 31
+DISTORTION is the value to be stored in the AUDCx registers.
+WAVEFORM: A 1 means the output is set high, a 0 means the output is set low.
+          For distortion 2 & 3 it is source pattern -> clock modifier pattern.
+CLOCKSPEED is the speed at which the registers are shifted.
+PITCH is the value to be stored in the AUDFx registers.
+NTSC are the calculated frequencies for the specified TV norm.
+NOTE is the note value, that is closest to the calculated frequency.
+FREQ is the frequency that this note would have if A4=440 Hz.
+CENT specifies how many percent the calculated frequency is off it's 
+     corresponding note frequency
 
-themeMusicNoteDelay     = $EE
-themeMusicFreqIndex     = $EF
+Distortion: 12 & 13
+Waveform  : 10
+Clockspeed: CPUclock/114
+*/
+var vcs_freq_chart = {
+   '0'   :    5274   ,
+   '1'   :    2637   ,
+   '2'   :    1760   ,
+   '3'   :    1318.5 ,
+   '4'   :    1046.5 ,
+   '5'   :     880   ,
+   '6'   :     740   ,
+   '7'   :     659.3 ,
+   '8'   :     587.3 ,
+   '9'   :     523.3 ,
+  '10'   :     466.2 ,
+  '11'   :     440   ,
+  '12'   :     392   ,
+  '13'   :     370   ,
+  '14'   :     349.2 ,
+  '15'   :     329.6 ,
+  '16'   :     311.1 ,
+  '17'   :     293.7 ,
+  '18'   :     277.2 ,
+  '19'   :     261.6 ,
+  '20'   :     246.9 ,
+  '21'   :     233.1 ,
+  '22'   :     233.1 ,
+  '23'   :     220   ,
+  '24'   :     207.7 ,
+  '25'   :     196   ,
+  '26'   :     196   ,
+  '27'   :     185   ,
+  '28'   :     185   ,
+  '29'   :     174.6 ,
+  '30'   :     164.8 ,
+  '31'   :     164.8 
+};
 
 
-PlayThemeMusic
-   lda #7
-   sta AUDV1
-   lda #SOUND_CHANNEL_LEAD
-   sta AUDC1
-   ldx themeMusicNoteDelay          ; get theme music note delay value
-   dex
-   bpl .playCurrentThemeNote        ; hold note if not negative
-   ldx #11                          ; initial hold note delay
-   ldy themeMusicFreqIndex          ; get theme music frequency index
-   iny                              ; increment frequency index
-   cpy #55
-   bcc .setThemeMusicFreqIndex
-   ldy #0
-
-
-	WebAudio API help:
-	http://modernweb.com/2014/03/31/creating-sound-with-the-web-audio-api-and-oscillators/
+/**
+ * List of notes and their respective frequences
+ * @type {Object}
  */
-
-
-var notes = {
+var generic_notes = {
   'C0': 16.35,
   'C#0': 17.32,
   'Db0': 17.32,
@@ -204,47 +203,69 @@ var notes = {
   'C8': 4186.01
 };
 
+/**
+ * 
+ */
+
 window.AudioContext = window.AudioContext || window.webkitAudioContext;
 var ctx = new AudioContext();
 
-function playNote(pitch, length, wave, vol) {
-  var frq = notes[pitch];
+function PlayNote(frq, notelength, bpm, wave, vol) {
   var o = ctx.createOscillator();
+  var t = ctx.currentTime;
+  bpm = bpm  || 300;
+  wave = wave || "square";
+  vol = vol || 0.1;
+
+  // 1 second divided by number of beats per second times number of beats (length of a note)
+  var playlength = 1 / (bpm / 60) * notelength;
   o.type = wave;
+  o.frequency.value = frq;
+  o.start(t);
+  o.stop(t + playlength);
+  t += playlength;
   var g = ctx.createGain();
   o.connect(g);
   g.connect(ctx.destination);
-  g.gain.value = (typeof vol === "undefined" || vol === null) ? 0.1 : vol;
-
-  if (frq) {
-    o.frequency.value = frq;
-    o.start(0);
-    o.stop(length);
-  }
+  g.gain.value = vol;
 }
-
-//playNote("A3", 1, "square", 0.3);
 
 
 function playSequence(sequence, opts) {
-  if (!opts) { opts = {}; }
-  // set defaults
-  var _opts = {
-    bpm : (opts.bpm) ? opts.bpm : 300,
-    wave : (opts.wave) ? opts.wave : "square",
-    vol : (opts.vol) ? opts.vol : 0.1
+  var defaults = {
+    bpm : 300,
+    wave : "square",
+    vol : 0.1
   };
+  var _opts = Object.assign({}, defaults, opts);
 
-  var o, t = ctx.currentTime,
-    arrayLength = sequence.length,
-    playlength = 0;
+  sequence = sequence
+    .replace(/^\s*\.byte\s?(.+)\n?$/gim, '$1,')
+    .replace(/\n/g, '')
+    .rtrim(",")
+    .split(",");
 
-  for (var i = 0; i < arrayLength; i++) {
+  var o; 
+  var t = ctx.currentTime;
+  var playlength = 0;
+
+  var _seq = [];
+  var lastPos = 0;
+  sequence.forEach(function(item, pos, arr){
+    if (pos === 0 || item !== arr[pos-1]) {
+      _seq.push( { frq: vcs_freq_chart[item],  notelength : 1 } ); 
+      lastPos = _seq.length - 1;
+    } else {
+      _seq[lastPos].notelength++;
+    }
+  });
+
+  for (var i = 0; i < _seq.length; i++) {
     o = ctx.createOscillator();
     // 1 second divided by number of beats per second times number of beats (length of a note)
-    playlength = 1 / (_opts.bpm / 60) * sequence[i].notelength;
+    playlength = 1 / (_opts.bpm / 60) * _seq[i].notelength;
     o.type = _opts.wave;
-    o.frequency.value = sequence[i].frq;
+    o.frequency.value = _seq[i].frq;
     o.start(t);
     o.stop(t + playlength);
     t += playlength;

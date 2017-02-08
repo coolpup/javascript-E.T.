@@ -3,7 +3,8 @@ var draw = require('./draw.js');
 
 var vcs = {
 
-  draw : draw
+  draw : draw,
+  sound : sound
 };
 
 window.vcs = vcs;

@@ -41,3 +41,12 @@ module.exports = {
     return parts;
   }
 };
+
+String.prototype.rtrim = function (s) {
+  if (!s) { s = '\\s';} // default to whitespace
+  return this.replace(new RegExp("[" + s + "]*$"), '');
+};
+String.prototype.ltrim = function (s) {
+  if (!s) { s = '\\s';} // default to whitespace
+  return this.replace(new RegExp("^[" + s + "]*"), '');
+};
